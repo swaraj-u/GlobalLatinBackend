@@ -5,16 +5,20 @@ export async function handler(event) {
     const body = JSON.parse(event.body);
     const { metadata, file } = body; 
 
+    const bucketName = 'BUCKET_NAME';
+    const region = 'region';
     const fileName = `${metadata.email}-${Date.now()}.mp4`;
+    const s3URL = `https://${bucketName}.s3.${region}.amazonaws.com/${fileName}`
 
     const buffer = Buffer.from(file, 'base64');
 
     const params = {
-        Bucket: 'BUCKET_NAME',
+        Bucket: bucketName,
         Key: fileName,
         Body: buffer,
         ContentType: 'video/mp4',
         Metadata: {
+            s3URL: s3URL,
             ...metadata
         }
     };
@@ -22,27 +26,15 @@ export async function handler(event) {
     try {
         const s3Response = await s3.upload(params).promise();
 
-        const updatedMetadata = {
-            ...metadata,
-            videoUrl: s3Response.Location
-        };
-
-        const copyParams = {
-            Bucket: 'BUCKET_NAME',
-            Key: fileName,
-            CopySource: `${'BUCKET_NAME'}/${fileName}`,
-            Metadata: updatedMetadata,
-            MetadataDirective: 'REPLACE'
-        };
-
-        await s3.copyObject(copyParams).promise();
-
         return {
             statusCode: 200,
             body: JSON.stringify({
                 message: 'File uploaded successfully',
                 fileUrl: s3Response.Location,
-                metadata: metadata
+                metadata: {
+                    ...metadata,
+                    videoUrl: s3Response.Location
+                }
             })
         };
     } catch (error) {
